@@ -1,6 +1,15 @@
 from flask import Flask, jsonify, render_template_string, request
 from flask_cors import CORS
 import random
+import google.generativeai as genai
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Configure Gemini API
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 app = Flask(__name__)
 CORS(app)
@@ -186,6 +195,50 @@ DASHBOARD_HTML = """
             color: #333;
             margin-bottom: 5px;
             font-size: 0.9em;
+        }
+        
+        .form-group-with-button {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+        }
+        
+        .form-group-with-button input {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border 0.3s ease;
+        }
+        
+        .form-group-with-button input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .lookup-btn {
+            padding: 10px 15px;
+            background-color: #764ba2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+        
+        .lookup-btn:hover {
+            background-color: #667eea;
+            transform: translateY(-2px);
+        }
+        
+        .lookup-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
         
         .form-group input {
@@ -404,7 +457,7 @@ DASHBOARD_HTML = """
     <div class="container">
         <div class="header">
             <h1>🌾 Smart Irrigation Dashboard</h1>
-            <p>Intelligent Water Distribution System</p>
+            <p>Intelligent Water Distribution System with AI</p>
         </div>
         
         <div id="message" class="message"></div>
@@ -459,8 +512,11 @@ DASHBOARD_HTML = """
                         <input type="number" id="currentMoisture" min="0" max="100" step="0.1" required>
                     </div>
                     <div class="form-group">
-                        <label for="targetMoisture">Target Moisture %</label>
-                        <input type="number" id="targetMoisture" min="0" max="100" step="0.1" required>
+                        <label>Target Moisture %</label>
+                        <div class="form-group-with-button">
+                            <input type="number" id="targetMoisture" min="0" max="100" step="0.1" required>
+                            <button type="button" class="lookup-btn" onclick="lookupTreeWaterNeeds()">🔍 Lookup</button>
+                        </div>
                     </div>
                 </div>
                 <div class="form-buttons">
@@ -496,6 +552,45 @@ DASHBOARD_HTML = """
             if (current < target - 10) return "high";
             if (current < target) return "medium";
             return "low";
+        }
+        
+        // Lookup optimal water needs for tree type using AI
+        async function lookupTreeWaterNeeds() {
+            const treeType = document.getElementById('treeType').value.trim();
+            
+            if (!treeType) {
+                alert('Please enter a tree type first');
+                return;
+            }
+            
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '⏳ Loading...';
+            
+            try {
+                const response = await fetch('/api/tree-knowledge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tree_type: treeType })
+                });
+                
+                const data = await response.json();
+                
+                if (data.optimal_moisture) {
+                    document.getElementById('targetMoisture').value = data.optimal_moisture;
+                    showMessage(`✅ Optimal moisture for ${treeType}: ${data.optimal_moisture}%`, 'success');
+                } else {
+                    alert('Using default 60%');
+                    document.getElementById('targetMoisture').value = 60;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Using default 60%');
+                document.getElementById('targetMoisture').value = 60;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔍 Lookup';
+            }
         }
         
         // Load and display fields
@@ -772,6 +867,42 @@ def calculate_water_needed(field):
     return round(abs(field["target_moisture"] - field["current_moisture"]) * field["area_m2"] * 0.01, 2)
 
 
+def get_tree_water_needs(tree_type):
+    """
+    Use Gemini AI to get optimal soil moisture percentage for a tree type.
+    
+    Args:
+        tree_type (str): Name of the tree type (e.g., "Orange", "Apple")
+    
+    Returns:
+        int: Optimal soil moisture percentage (0-100), defaults to 60 if API fails
+    """
+    try:
+        # Create prompt for Gemini
+        prompt = f"What is the optimal soil moisture percentage for growing {tree_type} trees? Respond with ONLY a number between 0 and 100 representing the percentage. No explanation."
+        
+        # Call Gemini API using flash model for faster responses
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(prompt)
+        
+        # Extract the response text
+        response_text = response.text.strip()
+        
+        # Try to parse as integer
+        optimal_moisture = int(''.join(filter(str.isdigit, response_text.split()[0])))
+        
+        # Ensure it's within valid range
+        if 0 <= optimal_moisture <= 100:
+            return optimal_moisture
+        else:
+            return 60
+    
+    except Exception as e:
+        # Log the error and return default value
+        print(f"Error calling Gemini API: {e}")
+        return 60  # Default fallback value
+
+
 @app.route("/", methods=["GET"])
 def home():
     """Render the HTML dashboard."""
@@ -900,6 +1031,28 @@ def refill_water_tank():
         "remaining": WATER_TANK,
         "total": 5000,
         "unit": "liters"
+    })
+
+
+# ============ AI Integration Routes ============
+
+@app.route("/api/tree-knowledge", methods=["POST"])
+def get_tree_knowledge():
+    """
+    Get optimal moisture percentage for a tree type using Gemini AI.
+    
+    Expected JSON: {"tree_type": "Orange"}
+    Returns JSON: {"tree_type": "Orange", "optimal_moisture": 55}
+    """
+    data = request.get_json()
+    tree_type = data.get("tree_type", "Unknown")
+    
+    # Get optimal moisture using Gemini AI
+    optimal_moisture = get_tree_water_needs(tree_type)
+    
+    return jsonify({
+        "tree_type": tree_type,
+        "optimal_moisture": optimal_moisture
     })
 
 
