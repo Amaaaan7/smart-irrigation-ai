@@ -1,15 +1,15 @@
 from flask import Flask, jsonify, render_template_string, request
 from flask_cors import CORS
 import random
-import google.generativeai as genai
+from google.genai import Client
 import os
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Configure Gemini API
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# Configure Gemini API with new google-genai package
+client = Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 app = Flask(__name__)
 CORS(app)
@@ -69,6 +69,18 @@ DASHBOARD_HTML = """
             text-align: center;
             font-weight: bold;
             display: none;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         .message.success {
@@ -79,6 +91,18 @@ DASHBOARD_HTML = """
         .message.error {
             background-color: rgba(255, 71, 87, 0.9);
             color: white;
+        }
+        
+        .message.info {
+            background-color: rgba(102, 126, 234, 0.9);
+            color: white;
+        }
+        
+        .message.critical {
+            background-color: rgba(255, 71, 87, 0.95);
+            color: white;
+            font-size: 1.1em;
+            border-left: 5px solid white;
         }
         
         .message.show {
@@ -309,6 +333,16 @@ DASHBOARD_HTML = """
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
         }
         
         .field-card {
@@ -529,6 +563,7 @@ DASHBOARD_HTML = """
         <div class="controls">
             <button onclick="simulateSensorData()" class="btn-secondary">Simulate Sensor Data</button>
             <button onclick="runWaterDistribution()" class="btn-secondary">Run Water Distribution</button>
+            <button onclick="resetDemo()" class="btn-secondary">Reset Demo</button>
         </div>
         
         <!-- Field Cards -->
@@ -752,9 +787,9 @@ DASHBOARD_HTML = """
                 }
                 
                 if (data.status === 'on') {
-                    showMessage(`Watering ON - Used ${data.water_used} L`, 'success');
+                    showMessage(`✅ Watering ON - Used ${data.water_used} L, moisture increased by ${data.moisture_increase}%`, 'success');
                 } else if (data.status === 'off') {
-                    showMessage(`Watering OFF - Returned ${data.water_returned} L`, 'success');
+                    showMessage(`🛑 Watering OFF - Moisture decreased`, 'success');
                 }
                 
                 await loadFields();
@@ -789,7 +824,7 @@ DASHBOARD_HTML = """
             }
         }
         
-        // Simulate sensor data
+        // Simulate sensor data with realistic drift
         async function simulateSensorData() {
             try {
                 const response = await fetch('/api/simulate', {
@@ -797,8 +832,9 @@ DASHBOARD_HTML = """
                 });
                 
                 if (!response.ok) throw new Error('Simulation failed');
+                const data = await response.json();
                 
-                showMessage('Sensor data simulated! Moisture levels randomized.', 'success');
+                showMessage(`📊 Sensor simulation: ${data.summary}`, 'info');
                 await loadFields();
             } catch (error) {
                 showMessage('Error simulating data: ' + error.message, 'error');
@@ -806,26 +842,69 @@ DASHBOARD_HTML = """
             }
         }
         
-        // Run water distribution
+        // Run water distribution analysis
         async function runWaterDistribution() {
             try {
-                showMessage('Running water distribution analysis...', 'success');
-                await loadFields();
+                const response = await fetch('/api/distribute');
+                if (!response.ok) throw new Error('Failed to load distribution data');
+                const fields = await response.json();
+                
+                // Find critical, high, and check if all low
+                const criticalFields = fields.filter(f => f.priority === 'critical');
+                const highFields = fields.filter(f => f.priority === 'high');
+                const allLow = fields.every(f => f.priority === 'low' || f.priority === 'medium');
+                
+                // Show appropriate banner
+                if (criticalFields.length > 0) {
+                    const criticalList = criticalFields.map(f => `${f.name} (${f.water_needed_liters}L)`).join(', ');
+                    showMessage(`🚨 CRITICAL: Water ${criticalList} immediately!`, 'critical');
+                } else if (highFields.length > 0) {
+                    const highList = highFields.map(f => f.name).join(', ');
+                    showMessage(`⚠️ HIGH PRIORITY: ${highList} need watering soon`, 'info');
+                } else {
+                    showMessage('✅ All fields adequately watered!', 'success');
+                }
+                
+                // Display fields with fade-in animation
+                displayFields(fields);
+                await loadWaterTank();
             } catch (error) {
                 showMessage('Error: ' + error.message, 'error');
                 console.error(error);
             }
         }
         
-        // Show message
+        // Reset demo to initial state
+        async function resetDemo() {
+            if (!confirm('Reset all fields and water tank to initial state?')) return;
+            
+            try {
+                const response = await fetch('/api/reset-demo', {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) throw new Error('Failed to reset demo');
+                const data = await response.json();
+                
+                showMessage(data.message, 'success');
+                await loadFields();
+            } catch (error) {
+                showMessage('Error resetting demo: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+        
+        // Show message with type (success, error, info, critical)
         function showMessage(text, type) {
             const messageDiv = document.getElementById('message');
             messageDiv.textContent = text;
             messageDiv.className = `message ${type} show`;
             
+            // Clear message after 5 seconds (longer for critical)
+            const duration = type === 'critical' ? 6000 : 5000;
             setTimeout(() => {
                 messageDiv.classList.remove('show');
-            }, 4000);
+            }, duration);
         }
         
         // Load fields on page load
@@ -870,6 +949,7 @@ def calculate_water_needed(field):
 def get_tree_water_needs(tree_type):
     """
     Use Gemini AI to get optimal soil moisture percentage for a tree type.
+    Uses the new google-genai package.
     
     Args:
         tree_type (str): Name of the tree type (e.g., "Orange", "Apple")
@@ -881,9 +961,11 @@ def get_tree_water_needs(tree_type):
         # Create prompt for Gemini
         prompt = f"What is the optimal soil moisture percentage for growing {tree_type} trees? Respond with ONLY a number between 0 and 100 representing the percentage. No explanation."
         
-        # Call Gemini API using flash model for faster responses
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(prompt)
+        # Call Gemini API using new google-genai Client
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt
+        )
         
         # Extract the response text
         response_text = response.text.strip()
@@ -898,7 +980,7 @@ def get_tree_water_needs(tree_type):
             return 60
     
     except Exception as e:
-        # Log the error and return default value
+        # Log the error and return default value (graceful fallback)
         print(f"Error calling Gemini API: {e}")
         return 60  # Default fallback value
 
@@ -920,9 +1002,9 @@ def get_all_fields():
 @app.route("/api/fields", methods=["POST"])
 def create_field():
     """
-    Create a new field.
+    Create a new field with auto-assigned ID.
     Expected JSON: {name, tree_type, tree_count, position, area_m2, current_moisture, target_moisture}
-    Auto-assigns id starting from 1.
+    Stores original_current_moisture for demo reset functionality.
     """
     global NEXT_FIELD_ID
     
@@ -937,6 +1019,7 @@ def create_field():
         "position": data.get("position"),
         "area_m2": data.get("area_m2"),
         "current_moisture": data.get("current_moisture"),
+        "original_current_moisture": data.get("current_moisture"),  # Store original for reset
         "target_moisture": data.get("target_moisture"),
         "watering_active": False  # Default to not watering
     }
@@ -959,15 +1042,14 @@ def get_field(field_id):
 
 @app.route("/api/fields/<int:field_id>", methods=["DELETE"])
 def delete_field(field_id):
-    """Delete a field by id. First turn off watering if active and return water."""
+    """Delete a field by id. Deactivate watering if active."""
     global WATER_TANK
     
     for i, field in enumerate(FIELDS):
         if field["id"] == field_id:
-            # If watering is active, return water to tank
+            # If watering is active, just deactivate it (water is NOT returned)
             if field["watering_active"]:
-                water_needed = calculate_water_needed(field)
-                WATER_TANK += water_needed
+                field["watering_active"] = False
             
             FIELDS.pop(i)
             return jsonify({"status": "deleted"}), 200
@@ -979,8 +1061,13 @@ def delete_field(field_id):
 def toggle_water(field_id):
     """
     Toggle watering for a field.
-    If turning ON: check if enough water, deduct from tank.
-    If turning OFF: return water to tank.
+    
+    When turning ON:
+    - Deduct from tank (water needed = target - current adjusted)
+    - Increase current_moisture by min(20, target - current)
+    
+    When turning OFF:
+    - Just deactivate (water NOT returned to tank - simulates consumption)
     """
     global WATER_TANK
     
@@ -989,18 +1076,26 @@ def toggle_water(field_id):
             water_needed = calculate_water_needed(field)
             
             if not field["watering_active"]:
-                # Turning ON
+                # Turning ON: check if enough water, deduct, and increase moisture
                 if WATER_TANK >= water_needed:
                     WATER_TANK -= water_needed
+                    
+                    # Increase moisture realistically: min(20, target - current)
+                    moisture_increase = min(20, field["target_moisture"] - field["current_moisture"])
+                    field["current_moisture"] += moisture_increase
                     field["watering_active"] = True
-                    return jsonify({"status": "on", "water_used": water_needed}), 200
+                    
+                    return jsonify({
+                        "status": "on",
+                        "water_used": water_needed,
+                        "moisture_increase": moisture_increase
+                    }), 200
                 else:
                     return jsonify({"error": "Not enough water"}), 400
             else:
-                # Turning OFF
-                WATER_TANK += water_needed
+                # Turning OFF: just deactivate, water stays consumed
                 field["watering_active"] = False
-                return jsonify({"status": "off", "water_returned": water_needed}), 200
+                return jsonify({"status": "off"}), 200
     
     return jsonify({"error": "Field not found"}), 404
 
@@ -1056,6 +1151,32 @@ def get_tree_knowledge():
     })
 
 
+# ============ Demo Reset Route ============
+
+@app.route("/api/reset-demo", methods=["POST"])
+def reset_demo():
+    """
+    Reset the entire demo to initial state:
+    - Reset WATER_TANK to 5000
+    - Restore all fields to their original current_moisture values
+    - Deactivate all watering
+    """
+    global WATER_TANK
+    
+    WATER_TANK = 5000
+    
+    for field in FIELDS:
+        # Restore original moisture value
+        field["current_moisture"] = field["original_current_moisture"]
+        # Deactivate watering
+        field["watering_active"] = False
+    
+    return jsonify({
+        "status": "reset",
+        "message": f"✅ Demo reset! Tank restored to 5000L, {len(FIELDS)} field(s) restored to original state."
+    })
+
+
 # ============ Distribution & Simulation Routes ============
 
 @app.route("/api/distribute", methods=["GET"])
@@ -1085,23 +1206,42 @@ def distribute_water():
 @app.route("/api/simulate", methods=["POST"])
 def simulate_sensor_data():
     """
-    Simulate sensor data by randomizing current_moisture for all fields.
-    Moisture values are randomized between 20-80.
-    If any field has watering_active=True, set it to False (safety reset).
+    Simulate sensor data with realistic moisture drift.
+    
+    For each field:
+    - If watering_active: increase moisture by 20, set watering_active=False
+    - Otherwise: drift moisture by random value between -15 and +15
+    - Clamp result between 10 and 95
+    
+    Returns summary of changes.
     """
     global WATER_TANK
     
-    for field in FIELDS:
-        # If watering is active, turn it off and return water
-        if field["watering_active"]:
-            water_needed = calculate_water_needed(field)
-            WATER_TANK += water_needed
-            field["watering_active"] = False
-        
-        # Randomize moisture
-        field["current_moisture"] = random.randint(20, 80)
+    changes = []
     
-    return jsonify({"status": "ok"})
+    for field in FIELDS:
+        old_moisture = field["current_moisture"]
+        
+        if field["watering_active"]:
+            # Watering worked: increase by 20 and turn off
+            field["current_moisture"] = min(95, field["current_moisture"] + 20)
+            field["watering_active"] = False
+            changes.append(f"{field['name']}: +20% (watering effect)")
+        else:
+            # Natural drift: random between -15 and +15
+            drift = random.randint(-15, 15)
+            field["current_moisture"] += drift
+            # Clamp between 10 and 95
+            field["current_moisture"] = max(10, min(95, field["current_moisture"]))
+            drift_str = f"+{drift}" if drift >= 0 else f"{drift}"
+            changes.append(f"{field['name']}: {drift_str}%")
+    
+    summary = ", ".join(changes) if changes else "No fields to simulate"
+    
+    return jsonify({
+        "status": "ok",
+        "summary": summary
+    })
 
 
 if __name__ == "__main__":
