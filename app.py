@@ -921,30 +921,37 @@ def calculate_priority(field):
     Calculate irrigation priority based on current moisture level.
     
     Priority levels:
-    - critical: current_moisture < 30
-    - high: current_moisture < target_moisture - 10
-    - medium: current_moisture < target_moisture
-    - low: otherwise
+    - low: current_moisture >= target_moisture (enough water, no action needed)
+    - critical: current_moisture < 30 (very dry, urgent)
+    - high: current_moisture < target_moisture - 10 (dry, needs watering)
+    - medium: current_moisture < target_moisture (slightly below target)
     """
     current = field["current_moisture"]
     target = field["target_moisture"]
     
+    # If current is above or equal to target, field has enough water
+    if current >= target:
+        return "low"
+    
+    # Now we know current < target, so check severity levels
     if current < 30:
         return "critical"
     elif current < target - 10:
         return "high"
-    elif current < target:
-        return "medium"
     else:
-        return "low"
+        # current < target but >= 30 and not < target - 10
+        return "medium"
 
 
 def calculate_water_needed(field):
     """
     Calculate water needed for a field in liters.
-    Formula: abs(target - current) * area_m2 * 0.01
+    
+    Uses max(0, target - current) so fields at or above target show 0L needed.
+    Formula: max(0, target - current) * area_m2 * 0.01
     """
-    return round(abs(field["target_moisture"] - field["current_moisture"]) * field["area_m2"] * 0.01, 2)
+    water_deficit = max(0, field["target_moisture"] - field["current_moisture"])
+    return round(water_deficit * field["area_m2"] * 0.01, 2)
 
 
 def get_tree_water_needs(tree_type):
