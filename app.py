@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, render_template_string, request
 from flask_cors import CORS
 import random
+import re
 from google.genai import Client
 import os
 from dotenv import load_dotenv
@@ -949,7 +950,7 @@ def calculate_water_needed(field):
 def get_tree_water_needs(tree_type):
     """
     Use Gemini AI to get optimal soil moisture percentage for a tree type.
-    Uses the new google-genai package.
+    Uses the new google-genai package with improved response parsing.
     
     Args:
         tree_type (str): Name of the tree type (e.g., "Orange", "Apple")
@@ -961,23 +962,28 @@ def get_tree_water_needs(tree_type):
         # Create prompt for Gemini
         prompt = f"What is the optimal soil moisture percentage for growing {tree_type} trees? Respond with ONLY a number between 0 and 100 representing the percentage. No explanation."
         
-        # Call Gemini API using new google-genai Client
+        # Call Gemini API using new google-genai Client with gemini-2.5-flash model
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             contents=prompt
         )
         
         # Extract the response text
         response_text = response.text.strip()
         
-        # Try to parse as integer
-        optimal_moisture = int(''.join(filter(str.isdigit, response_text.split()[0])))
+        # Use regex to safely extract the first number from anywhere in the response
+        # This is more robust than string splitting and filtering
+        match = re.search(r'\d+', response_text)
         
-        # Ensure it's within valid range
-        if 0 <= optimal_moisture <= 100:
-            return optimal_moisture
-        else:
-            return 60
+        if match:
+            optimal_moisture = int(match.group())
+            
+            # Ensure it's within valid range (0-100)
+            if 0 <= optimal_moisture <= 100:
+                return optimal_moisture
+        
+        # If regex didn't find a valid number, return default
+        return 60
     
     except Exception as e:
         # Log the error and return default value (graceful fallback)
@@ -1142,7 +1148,7 @@ def get_tree_knowledge():
     data = request.get_json()
     tree_type = data.get("tree_type", "Unknown")
     
-    # Get optimal moisture using Gemini AI
+    # Get optimal moisture using Gemini AI with improved parsing
     optimal_moisture = get_tree_water_needs(tree_type)
     
     return jsonify({
