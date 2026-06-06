@@ -329,6 +329,130 @@ DASHBOARD_HTML = """
             transform: translateY(-2px);
         }
         
+        /* AI Plan Container */
+        #aiPlanContainer {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        #aiPlanContainer.show {
+            display: block;
+        }
+        
+        .ai-plan-header {
+            color: #667eea;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 15px;
+        }
+        
+        .ai-plan-header h2 {
+            font-size: 1.6em;
+            margin-bottom: 10px;
+        }
+        
+        .ai-plan-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .ai-stat {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .ai-stat-label {
+            font-size: 0.85em;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .ai-stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+        }
+        
+        .ai-strategy {
+            background: #f5f5f5;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+        }
+        
+        .ai-strategy strong {
+            color: #667eea;
+        }
+        
+        .field-allocations {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+        }
+        
+        .allocation-card {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .allocation-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .allocation-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .allocation-status-icon {
+            font-size: 1.5em;
+        }
+        
+        .allocation-status-icon.allocated {
+            color: #2ed573;
+        }
+        
+        .allocation-status-icon.skipped {
+            color: #ff4757;
+        }
+        
+        .allocation-field-name {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #333;
+            flex: 1;
+        }
+        
+        .allocation-liters {
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        
+        .allocation-reason {
+            color: #666;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        
         /* Field Cards */
         .cards-grid {
             display: grid;
@@ -565,8 +689,12 @@ DASHBOARD_HTML = """
         <div class="controls">
             <button onclick="simulateSensorData()" class="btn-secondary">Simulate Sensor Data</button>
             <button onclick="runWaterDistribution()" class="btn-secondary">Run Water Distribution</button>
+            <button onclick="generateRationingPlan()" class="btn-secondary">🤖 AI Rationing Plan</button>
             <button onclick="resetDemo()" class="btn-secondary">Reset Demo</button>
         </div>
+        
+        <!-- AI Rationing Plan Container -->
+        <div id="aiPlanContainer"></div>
         
         <!-- Field Cards -->
         <div class="cards-grid" id="fieldsContainer">
@@ -876,6 +1004,75 @@ DASHBOARD_HTML = """
             }
         }
         
+        // Generate AI rationing plan
+        async function generateRationingPlan() {
+            const container = document.getElementById('aiPlanContainer');
+            
+            try {
+                const response = await fetch('/api/ai-rationing');
+                if (!response.ok) throw new Error('Failed to fetch rationing plan');
+                
+                const plan = await response.json();
+                
+                // Build HTML for the plan
+                let html = `
+                    <div class="ai-plan-header">
+                        <h2>🤖 AI Water Rationing Plan</h2>
+                    </div>
+                    
+                    <div class="ai-plan-stats">
+                        <div class="ai-stat">
+                            <div class="ai-stat-label">Water Available</div>
+                            <div class="ai-stat-value">${plan.total_water_available} L</div>
+                        </div>
+                        <div class="ai-stat">
+                            <div class="ai-stat-label">Water Needed</div>
+                            <div class="ai-stat-value">${plan.total_water_needed} L</div>
+                        </div>
+                    </div>
+                    
+                    <div class="ai-strategy">
+                        <strong>Strategy:</strong> ${plan.rationing_strategy}
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin-bottom: 15px;">Field Allocations</h3>
+                    <div class="field-allocations">
+                `;
+                
+                // Render field allocations
+                if (plan.field_allocations && Array.isArray(plan.field_allocations)) {
+                    plan.field_allocations.forEach(allocation => {
+                        const isAllocated = allocation.allocated_liters > 0;
+                        const icon = isAllocated ? '✅' : '❌';
+                        const statusClass = isAllocated ? 'allocated' : 'skipped';
+                        
+                        html += `
+                            <div class="allocation-card">
+                                <div class="allocation-header">
+                                    <span class="allocation-status-icon ${statusClass}">${icon}</span>
+                                    <div class="allocation-field-name">${allocation.field_name}</div>
+                                    <div class="allocation-liters">${allocation.allocated_liters}L</div>
+                                </div>
+                                <div class="allocation-reason">${allocation.reason}</div>
+                            </div>
+                        `;
+                    });
+                }
+                
+                html += `
+                    </div>
+                `;
+                
+                container.innerHTML = html;
+                container.classList.add('show');
+                
+                showMessage('✅ AI rationing plan generated!', 'success');
+            } catch (error) {
+                showMessage('Error generating rationing plan: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+        
         // Reset demo to initial state
         async function resetDemo() {
             if (!confirm('Reset all fields and water tank to initial state?')) return;
@@ -887,6 +1084,9 @@ DASHBOARD_HTML = """
                 
                 if (!response.ok) throw new Error('Failed to reset demo');
                 const data = await response.json();
+                
+                // Hide AI plan container
+                document.getElementById('aiPlanContainer').classList.remove('show');
                 
                 showMessage(data.message, 'success');
                 await loadFields();
