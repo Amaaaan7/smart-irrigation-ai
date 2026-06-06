@@ -2,6 +2,7 @@ from flask import Flask, jsonify, render_template_string, request
 from flask_cors import CORS
 import random
 import re
+import json
 from google.genai import Client
 import os
 from dotenv import load_dotenv
@@ -1188,6 +1189,84 @@ def reset_demo():
         "status": "reset",
         "message": f"✅ Demo reset! Tank restored to 5000L, {len(FIELDS)} field(s) restored to original state."
     })
+
+
+# ============ AI Rationing Route ============
+
+@app.route("/api/ai-rationing", methods=["GET"])
+def ai_rationing():
+    """
+    Get AI-powered water rationing recommendations.
+    
+    Builds a description of the water tank and all fields, sends it to Gemini,
+    and returns the parsed JSON response with rationing recommendations.
+    
+    Returns JSON with Gemini's rationing recommendations.
+    """
+    try:
+        # Build description string
+        description = f"Water Tank Status:\n"
+        description += f"- Total Capacity: 5000 liters\n"
+        description += f"- Current Level: {WATER_TANK} liters\n"
+        description += f"- Available: {WATER_TANK} liters\n\n"
+        
+        description += f"Fields ({len(FIELDS)} total):\n"
+        for field in FIELDS:
+            description += f"- {field['name']} (ID: {field['id']})\n"
+            description += f"  * Tree Type: {field['tree_type']}\n"
+            description += f"  * Area: {field['area_m2']} m²\n"
+            description += f"  * Current Moisture: {field['current_moisture']}%\n"
+            description += f"  * Target Moisture: {field['target_moisture']}%\n"
+            description += f"  * Priority: {calculate_priority(field)}\n"
+            description += f"  * Water Needed: {calculate_water_needed(field)} liters\n"
+        
+        # Create prompt for Gemini
+        prompt = f"""Analyze the following irrigation system state and provide water rationing recommendations in JSON format.
+
+{description}
+
+Respond with ONLY a valid JSON object (no markdown, no code blocks) with the following structure:
+{{
+  "total_water_available": {WATER_TANK},
+  "total_water_needed": <sum of all water needed>,
+  "rationing_strategy": "<brief strategy description>",
+  "field_allocations": [
+    {{"field_id": 1, "field_name": "name", "allocated_liters": <amount>, "reason": "explanation"}},
+    ...
+  ],
+  "recommendations": ["<recommendation 1>", "<recommendation 2>", ...]
+}}
+
+If total water needed exceeds available water, skip lowest-priority fields. Fields with 0 liters must still appear in field_allocations with allocated_liters: 0."""
+        
+        # Call Gemini API
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        
+        # Extract the response text
+        response_text = response.text.strip()
+        
+        # Strip markdown code blocks using simple string replacement
+        response_text = response_text.replace("```json", "").replace("```", "").strip()
+        
+        # Parse the JSON response
+        rationing_data = json.loads(response_text)
+        
+        return jsonify(rationing_data), 200
+    
+    except json.JSONDecodeError as e:
+        return jsonify({
+            "error": "Failed to parse Gemini response as JSON",
+            "details": str(e)
+        }), 400
+    
+    except Exception as e:
+        return jsonify({
+            "error": "Failed to generate rationing recommendations",
+            "details": str(e)
+        }), 500
 
 
 # ============ Distribution & Simulation Routes ============
