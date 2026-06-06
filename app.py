@@ -18,7 +18,8 @@ CORS(app)
 
 # Global data storage
 FIELDS = []  # Empty list to start
-WATER_TANK = 5000  # Total water tank capacity in liters
+WATER_TANK = 5000      # Current water level
+TANK_CAPACITY = 5000   # Total tank capacity
 NEXT_FIELD_ID = 1  # Auto-increment field ID
 
 # HTML Dashboard Template
@@ -38,7 +39,7 @@ DASHBOARD_HTML = """
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0c4a6e 100%);
             min-height: 100vh;
             padding: 20px;
         }
@@ -51,17 +52,30 @@ DASHBOARD_HTML = """
         .header {
             text-align: center;
             color: white;
-            margin-bottom: 30px;
+            margin-bottom: 40px;
+            padding: 20px 0;
         }
         
         .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
+            font-size: 3em;
+            font-weight: 800;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(90deg, #ffffff 0%, #bae6fd 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
         
         .header p {
-            font-size: 1.1em;
-            opacity: 0.9;
+            font-size: 1.2em;
+            opacity: 0.85;
+            font-weight: 400;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.5;
+            color: #bae6fd;
         }
         
         .message {
@@ -114,16 +128,19 @@ DASHBOARD_HTML = """
         /* Water Tank Section */
         .water-tank-section {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 20px;
             margin-bottom: 30px;
         }
         
         .water-tank-card {
-            background: white;
-            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 16px;
             padding: 25px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
         
         .water-tank-card h2 {
@@ -148,7 +165,7 @@ DASHBOARD_HTML = """
         }
         
         .water-fill {
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(90deg, #0ea5e9 0%, #06b6d4 100%);
             height: 100%;
             border-radius: 10px;
             transition: width 0.5s ease;
@@ -191,11 +208,14 @@ DASHBOARD_HTML = """
         
         /* Add Field Form */
         .form-section {
-            background: white;
-            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 16px;
             padding: 25px;
             margin-bottom: 30px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
         
         .form-section h2 {
@@ -345,10 +365,10 @@ DASHBOARD_HTML = """
         }
         
         .ai-plan-header {
-            color: #667eea;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 15px;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 16px;
         }
         
         .ai-plan-header h2 {
@@ -472,10 +492,14 @@ DASHBOARD_HTML = """
         }
         
         .field-card {
-            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 16px;
             padding: 20px;
-            color: white;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            color: #1e293b;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
             position: relative;
         }
@@ -534,9 +558,8 @@ DASHBOARD_HTML = """
             background-color: rgba(255, 255, 255, 0.5);
         }
         
-        .priority-badge {
+.priority-badge {
             display: inline-block;
-            background-color: rgba(255, 255, 255, 0.3);
             padding: 6px 12px;
             border-radius: 20px;
             font-size: 0.8em;
@@ -545,6 +568,16 @@ DASHBOARD_HTML = """
             letter-spacing: 0.5px;
             margin-top: 10px;
         }
+
+        .field-card.critical { border-left: 5px solid #ff4757; }
+        .field-card.high     { border-left: 5px solid #ffa502; }
+        .field-card.medium   { border-left: 5px solid #ffd602; }
+        .field-card.low      { border-left: 5px solid #2ed573; }
+
+        .field-card.critical .priority-badge { background: #ff4757; color: white; }
+        .field-card.high     .priority-badge { background: #ffa502; color: white; }
+        .field-card.medium   .priority-badge { background: #ffd602; color: #333; }
+        .field-card.low      .priority-badge { background: #2ed573; color: white; }
         
         .moisture-info {
             margin-top: 15px;
@@ -552,8 +585,8 @@ DASHBOARD_HTML = """
             border-top: 1px solid rgba(255, 255, 255, 0.3);
         }
         
-        .moisture-bar {
-            background-color: rgba(255, 255, 255, 0.3);
+.moisture-bar {
+            background-color: #e0e0e0;
             height: 8px;
             border-radius: 5px;
             overflow: hidden;
@@ -561,7 +594,7 @@ DASHBOARD_HTML = """
         }
         
         .moisture-fill {
-            background-color: rgba(255, 255, 255, 0.8);
+            background: linear-gradient(90deg, #0ea5e9 0%, #06b6d4 100%);
             height: 100%;
             border-radius: 5px;
             transition: width 0.5s ease;
@@ -570,9 +603,10 @@ DASHBOARD_HTML = """
         .water-needed {
             margin-top: 12px;
             padding: 10px;
-            background-color: rgba(255, 255, 255, 0.2);
+            background-color: #f0f9ff;
             border-radius: 6px;
             font-weight: bold;
+            color: #0369a1;
         }
         
         .card-actions {
@@ -616,8 +650,8 @@ DASHBOARD_HTML = """
 <body>
     <div class="container">
         <div class="header">
-            <h1>🌾 Smart Irrigation Dashboard</h1>
-            <p>Intelligent Water Distribution System with AI</p>
+            <h1>💧 Farm Water Agent</h1>
+            <p>Thirsty vs. Can Wait — AI That Rations Water Before It Runs Out</p>
         </div>
         
         <div id="message" class="message"></div>
@@ -640,6 +674,15 @@ DASHBOARD_HTML = """
                     <button type="submit" class="btn-primary">Refill</button>
                 </form>
             </div>
+
+            <div class="water-tank-card">
+                <h2>⚙️ Set Capacity</h2>
+                <form class="refill-form" onsubmit="setTankCapacity(event)">
+                    <input type="number" id="tankCapacity" placeholder="Enter capacity (liters)" min="1" step="10" required>
+                    <button type="submit" class="btn-primary">Set</button>
+                    </form>
+            </div>
+
         </div>
         
         <!-- Add Field Form -->
@@ -719,6 +762,26 @@ DASHBOARD_HTML = """
             return "low";
         }
         
+        // Set tank capacity handler
+
+        async function setTankCapacity(event) {
+            event.preventDefault();
+            const capacity = parseFloat(document.getElementById('tankCapacity').value);
+            try {
+                const response = await fetch('/api/tank-capacity', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ capacity: capacity })
+                });
+                if (!response.ok) throw new Error('Failed');
+                const data = await response.json();
+                showMessage(`Tank capacity set to ${capacity} L`, 'success');
+                updateWaterTankDisplay(data);
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }   
+        }
+
         // Lookup optimal water needs for tree type using AI
         async function lookupTreeWaterNeeds() {
             const treeType = document.getElementById('treeType').value.trim();
@@ -1320,7 +1383,7 @@ def toggle_water(field_id):
 def get_water_tank():
     """Return water tank status."""
     return jsonify({
-        "total": 5000,
+        "total": TANK_CAPACITY,
         "remaining": WATER_TANK,
         "unit": "liters"
     })
@@ -1328,20 +1391,43 @@ def get_water_tank():
 
 @app.route("/api/water-tank/refill", methods=["POST"])
 def refill_water_tank():
-    """Refill water tank with specified amount."""
+    """Refill water tank with specified amount, capped at TANK_CAPACITY."""
     global WATER_TANK
     
     data = request.get_json()
     amount = data.get("amount", 0)
     
-    WATER_TANK += amount
+    WATER_TANK = min(WATER_TANK + amount, TANK_CAPACITY)
     
     return jsonify({
         "remaining": WATER_TANK,
-        "total": 5000,
+        "total": TANK_CAPACITY,
         "unit": "liters"
     })
 
+
+# ============ Tank Capacity Route ============
+
+@app.route("/api/tank-capacity", methods=["POST"])
+def set_tank_capacity():
+    """Set a new tank capacity. Caps WATER_TANK if it exceeds new capacity."""
+    global WATER_TANK, TANK_CAPACITY
+
+    data = request.get_json()
+    new_capacity = data.get("capacity", 0)
+
+    if not isinstance(new_capacity, (int, float)) or new_capacity <= 0:
+        return jsonify({"error": "Capacity must be a positive number"}), 400
+
+    TANK_CAPACITY = int(new_capacity)
+    if WATER_TANK > TANK_CAPACITY:
+        WATER_TANK = TANK_CAPACITY
+
+    return jsonify({
+        "total": TANK_CAPACITY,
+        "remaining": WATER_TANK,
+        "unit": "liters"
+    }), 200
 
 # ============ AI Integration Routes ============
 
@@ -1349,20 +1435,22 @@ def refill_water_tank():
 def get_tree_knowledge():
     """
     Get optimal moisture percentage for a tree type using Gemini AI.
-    
+
     Expected JSON: {"tree_type": "Orange"}
     Returns JSON: {"tree_type": "Orange", "optimal_moisture": 55}
     """
     data = request.get_json()
     tree_type = data.get("tree_type", "Unknown")
-    
-    # Get optimal moisture using Gemini AI with improved parsing
+
     optimal_moisture = get_tree_water_needs(tree_type)
-    
+
     return jsonify({
         "tree_type": tree_type,
         "optimal_moisture": optimal_moisture
     })
+
+
+
 
 
 # ============ Demo Reset Route ============
