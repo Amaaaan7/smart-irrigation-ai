@@ -1037,7 +1037,9 @@ DASHBOARD_HTML = """
         async function toggleWater(fieldId) {
             try {
                 const response = await fetch(`/api/fields/${fieldId}/water/toggle`, {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
                 });
                 
                 const data = await response.json();
@@ -1459,7 +1461,7 @@ def toggle_water(field_id):
         if field["id"] == field_id:
             water_needed = calculate_water_needed(field)
             
-            data = request.get_json() or {}
+            data = request.get_json(force=True, silent=True) or {}  
             auto_fill = data.get("auto", False)
             
             if not field["watering_active"]:
@@ -1731,13 +1733,13 @@ def simulate_sensor_data():
         old_moisture = field["current_moisture"]
         
         if field["watering_active"]:
-            # Watering worked: increase by 20 and turn off
-            field["current_moisture"] = min(95, field["current_moisture"] + 20)
+            # Watering worked: gradual increase and turn off
+            field["current_moisture"] = min(95, field["current_moisture"] + random.uniform(2, 5))
             field["watering_active"] = False
             changes.append(f"{field['name']}: +20% (watering effect)")
         else:
-            # Natural drift: random between -15 and +15
-            drift = random.randint(-15, 15)
+            # Natural drift: slow drying, slight recovery possible
+            drift = random.uniform(-3, -1)
             field["current_moisture"] += drift
             # Clamp between 10 and 95
             field["current_moisture"] = max(10, min(95, field["current_moisture"]))
