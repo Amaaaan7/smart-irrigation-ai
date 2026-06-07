@@ -751,7 +751,7 @@ DASHBOARD_HTML = """
     <script>
         // Calculate water needed for a field
         function calculateWaterNeeded(field) {
-            return Math.round(Math.abs(field.target_moisture - field.current_moisture) * field.area_m2 * 0.01 * 100) / 100;
+            return Math.round(Math.max(0, field.target_moisture - field.current_moisture) * field.area_m2 * 0.01 * 100) / 100;
         }
         
         // Calculate priority for a field
@@ -1469,7 +1469,7 @@ def reset_demo():
     """
     global WATER_TANK
     
-    WATER_TANK = 5000
+    WATER_TANK = TANK_CAPACITY
     
     for field in FIELDS:
         # Restore original moisture value
@@ -1498,7 +1498,7 @@ def ai_rationing():
     try:
         # Build description string
         description = f"Water Tank Status:\n"
-        description += f"- Total Capacity: 5000 liters\n"
+        description += f"- Total Capacity: {TANK_CAPACITY} liters\n"
         description += f"- Current Level: {WATER_TANK} liters\n"
         description += f"- Available: {WATER_TANK} liters\n\n"
         
