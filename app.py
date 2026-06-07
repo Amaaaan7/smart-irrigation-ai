@@ -20,10 +20,60 @@ app = Flask(__name__)
 CORS(app)
 
 # Global data storage
-FIELDS = []  # Empty list to start
-WATER_TANK = 5000      # Current water level
-TANK_CAPACITY = 5000   # Total tank capacity
-NEXT_FIELD_ID = 1  # Auto-increment field ID
+WATER_TANK = 3200
+TANK_CAPACITY = 5000
+NEXT_FIELD_ID = 5
+
+FIELDS = [
+    {
+        "id": 1,
+        "name": "North Orchard",
+        "tree_type": "Orange",
+        "tree_count": 50,
+        "position": "North",
+        "area_m2": 2000,
+        "current_moisture": 22,
+        "target_moisture": 60,
+        "watering_active": False,
+        "original_current_moisture": 22
+    },
+    {
+        "id": 2,
+        "name": "South Grove",
+        "tree_type": "Olive",
+        "tree_count": 80,
+        "position": "South",
+        "area_m2": 3500,
+        "current_moisture": 30,
+        "target_moisture": 55,
+        "watering_active": False,
+        "original_current_moisture": 30
+    },
+    {
+        "id": 3,
+        "name": "East Field",
+        "tree_type": "Apple",
+        "tree_count": 30,
+        "position": "East",
+        "area_m2": 1200,
+        "current_moisture": 52,
+        "target_moisture": 65,
+        "watering_active": False,
+        "original_current_moisture": 52
+    },
+    {
+        "id": 4,
+        "name": "West Vineyard",
+        "tree_type": "Grape",
+        "tree_count": 120,
+        "position": "West",
+        "area_m2": 4000,
+        "current_moisture": 70,
+        "target_moisture": 60,
+        "watering_active": False,
+        "original_current_moisture": 70
+    }
+]
 
 # HTML Dashboard Template
 DASHBOARD_HTML = """
