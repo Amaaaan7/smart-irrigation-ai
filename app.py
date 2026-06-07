@@ -1211,7 +1211,7 @@ DASHBOARD_HTML = """
             }
         }
         // Apply AI rationing plan
-        
+
         async function applyRationingPlan() {
             if (!currentPlan) {
                 showMessage('No plan to apply. Generate a plan first.', 'error');
@@ -1227,8 +1227,10 @@ DASHBOARD_HTML = """
                     const field = fields.find(f => f.id === allocation.field_id);
 
                     if (field && !field.watering_active) {
-                        const res = await fetch(`/api/fields/${allocation.field_id}/water/toggle`, {
-                            method: 'POST'
+                       const res = await fetch(`/api/fields/${allocation.field_id}/water/toggle`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({auto: true})
                         });
                         if (res.ok) activated++;
                     }
@@ -1457,16 +1459,35 @@ def toggle_water(field_id):
         if field["id"] == field_id:
             water_needed = calculate_water_needed(field)
             
+            data = request.get_json() or {}
+            auto_fill = data.get("auto", False)
+            
             if not field["watering_active"]:
-                # Turning ON: check if enough water, deduct, and increase moisture
+                # Turning ON
+                
+                # Auto-fill logic: fill to target in one go, even if tank is low
+                if auto_fill and water_needed > 0:
+                    available = min(WATER_TANK, water_needed)
+                    if available <= 0:
+                        return jsonify({"error": "Not enough water"}), 400
+                    ratio = available / water_needed
+                    deficit = field["target_moisture"] - field["current_moisture"]
+                    moisture_gain = round(deficit * ratio, 1)
+                    WATER_TANK -= available
+                    field["current_moisture"] = round(field["current_moisture"] + moisture_gain, 1)
+                    field["watering_active"] = True
+                    return jsonify({
+                        "status": "on",
+                        "water_used": round(available, 2),
+                        "moisture_increase": moisture_gain
+                    }), 200
+                
+                # Normal toggle: one burst only
                 if WATER_TANK >= water_needed:
                     WATER_TANK -= water_needed
-                    
-                    # Increase moisture realistically: min(20, target - current)
                     moisture_increase = max(0, min(20, field["target_moisture"] - field["current_moisture"]))
                     field["current_moisture"] += moisture_increase
                     field["watering_active"] = True
-                    
                     return jsonify({
                         "status": "on",
                         "water_used": water_needed,
@@ -1474,8 +1495,9 @@ def toggle_water(field_id):
                     }), 200
                 else:
                     return jsonify({"error": "Not enough water"}), 400
+            
             else:
-                # Turning OFF: just deactivate, water stays consumed
+                # Turning OFF
                 field["watering_active"] = False
                 return jsonify({"status": "off"}), 200
     
@@ -1594,7 +1616,7 @@ def ai_rationing():
     Builds a description of the water tank and all fields, sends it to GitHub Models (GPT-4o-mini),
     and returns the parsed JSON response with rationing recommendations.
     
-    Returns JSON with Gemini's rationing recommendations.
+    Returns JSON with AI rationing recommendations.
     """
     try:
         # Build description string
