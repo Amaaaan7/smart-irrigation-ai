@@ -3,15 +3,18 @@ from flask_cors import CORS
 import random
 import re
 import json
-from google.genai import Client
+from openai import OpenAI
 import os
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Configure Gemini API with new google-genai package
-client = Client(api_key=os.getenv("GEMINI_API_KEY"))
+# Configure GitHub Models API
+client = OpenAI(
+    base_url="https://models.inference.ai.azure.com",
+    api_key=os.getenv("GITHUB_TOKEN"),
+)
 
 app = Flask(__name__)
 CORS(app)
@@ -1233,14 +1236,15 @@ def get_tree_water_needs(tree_type):
         # Create prompt for Gemini
         prompt = f"What is the optimal soil moisture percentage for growing {tree_type} trees? Respond with ONLY a number between 0 and 100 representing the percentage. No explanation."
         
-        # Call Gemini API using new google-genai Client with gemini-2.5-flash model
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
+        # Call GitHub Models API
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=50
         )
         
         # Extract the response text
-        response_text = response.text.strip()
+        response_text = response.choices[0].message.content.strip()
         
         # Use regex to safely extract the first number from anywhere in the response
         # This is more robust than string splitting and filtering
@@ -1527,14 +1531,15 @@ Respond with ONLY a valid JSON object (no markdown, no code blocks) with the fol
 
 If total water needed exceeds available water, skip lowest-priority fields. Fields with 0 liters must still appear in field_allocations with allocated_liters: 0."""
         
-        # Call Gemini API
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
+        # Call GitHub Models API
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1000
         )
         
         # Extract the response text
-        response_text = response.text.strip()
+        response_text = response.choices[0].message.content.strip()
         
         # Strip markdown code blocks using simple string replacement
         response_text = response_text.replace("```json", "").replace("```", "").strip()
