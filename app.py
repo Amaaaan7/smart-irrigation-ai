@@ -985,7 +985,7 @@ DASHBOARD_HTML = """
                 if (data.status === 'on') {
                     showMessage(`✅ Watering ON - Used ${data.water_used} L, moisture increased by ${data.moisture_increase}%`, 'success');
                 } else if (data.status === 'off') {
-                    showMessage(`🛑 Watering OFF - Moisture decreased`, 'success');
+                    showMessage(`🛑 Watering OFF - Pump stopped`, 'success');
                 }
                 
                 await loadFields();
@@ -1223,8 +1223,8 @@ def calculate_water_needed(field):
 
 def get_tree_water_needs(tree_type):
     """
-    Use Gemini AI to get optimal soil moisture percentage for a tree type.
-    Uses the new google-genai package with improved response parsing.
+    Use GitHub Models AI to get optimal soil moisture percentage for a tree type.
+    Uses GPT-4o-mini via the OpenAI-compatible GitHub Models endpoint.
     
     Args:
         tree_type (str): Name of the tree type (e.g., "Orange", "Apple")
@@ -1233,7 +1233,7 @@ def get_tree_water_needs(tree_type):
         int: Optimal soil moisture percentage (0-100), defaults to 60 if API fails
     """
     try:
-        # Create prompt for Gemini
+        # Create prompt for Github models 
         prompt = f"What is the optimal soil moisture percentage for growing {tree_type} trees? Respond with ONLY a number between 0 and 100 representing the percentage. No explanation."
         
         # Call GitHub Models API
@@ -1262,7 +1262,7 @@ def get_tree_water_needs(tree_type):
     
     except Exception as e:
         # Log the error and return default value (graceful fallback)
-        print(f"Error calling Gemini API: {e}")
+        print(f"Error calling GitHub Models API: {e}")
         return 60  # Default fallback value
 
 
@@ -1362,7 +1362,7 @@ def toggle_water(field_id):
                     WATER_TANK -= water_needed
                     
                     # Increase moisture realistically: min(20, target - current)
-                    moisture_increase = min(20, field["target_moisture"] - field["current_moisture"])
+                    moisture_increase = max(0, min(20, field["target_moisture"] - field["current_moisture"]))
                     field["current_moisture"] += moisture_increase
                     field["watering_active"] = True
                     
@@ -1479,7 +1479,7 @@ def reset_demo():
     
     return jsonify({
         "status": "reset",
-        "message": f"✅ Demo reset! Tank restored to 5000L, {len(FIELDS)} field(s) restored to original state."
+        "message": f"✅ Demo reset! Tank restored to {TANK_CAPACITY}L, {len(FIELDS)} field(s) restored to original state."
     })
 
 
