@@ -799,6 +799,7 @@ DASHBOARD_HTML = """
     </div>
     
     <script>
+        let currentPlan = null;
         // Calculate water needed for a field
         function calculateWaterNeeded(field) {
             return Math.round(Math.max(0, field.target_moisture - field.current_moisture) * field.area_m2 * 0.01 * 100) / 100;
@@ -1144,6 +1145,8 @@ DASHBOARD_HTML = """
                 
                 const plan = await response.json();
                 
+                currentPlan = plan;
+                
                 // Build HTML for the plan
                 let html = `
                     <div class="ai-plan-header">
@@ -1191,6 +1194,11 @@ DASHBOARD_HTML = """
                 
                 html += `
                     </div>
+                    <div style="margin-top: 24px; text-align: center;">
+                        <button onclick="applyRationingPlan()" style="background: linear-gradient(135deg, #667eea 0%, #22c55e 100%); color: white; border: none; padding: 14px 32px; border-radius: 10px; font-size: 1em; font-weight: 600; cursor: pointer;">
+                            ⚡ Apply Plan — Activate Fields Now
+                        </button>
+                    </div>
                 `;
                 
                 container.innerHTML = html;
@@ -1202,6 +1210,35 @@ DASHBOARD_HTML = """
                 console.error(error);
             }
         }
+        // Apply AI rationing plan
+        
+        async function applyRationingPlan() {
+            if (!currentPlan) {
+                showMessage('No plan to apply. Generate a plan first.', 'error');
+                return;
+            }
+
+            let activated = 0;
+
+            for (const allocation of currentPlan.field_allocations) {
+                if (allocation.allocated_liters > 0) {
+                    const fieldsRes = await fetch('/api/fields');
+                    const fields = await fieldsRes.json();
+                    const field = fields.find(f => f.id === allocation.field_id);
+
+                    if (field && !field.watering_active) {
+                        const res = await fetch(`/api/fields/${allocation.field_id}/water/toggle`, {
+                            method: 'POST'
+                        });
+                        if (res.ok) activated++;
+                    }
+                }
+            }
+
+            showMessage(`✅ AI plan applied! ${activated} field(s) activated.`, 'success');
+            await loadFields();
+        }
+
         
         // Reset demo to initial state
         async function resetDemo() {
@@ -1502,7 +1539,7 @@ def set_tank_capacity():
 @app.route("/api/tree-knowledge", methods=["POST"])
 def get_tree_knowledge():
     """
-    Get optimal moisture percentage for a tree type using Gemini AI.
+    Get optimal moisture percentage for a tree type using GitHub Models AI.
 
     Expected JSON: {"tree_type": "Orange"}
     Returns JSON: {"tree_type": "Orange", "optimal_moisture": 55}
@@ -1554,7 +1591,7 @@ def ai_rationing():
     """
     Get AI-powered water rationing recommendations.
     
-    Builds a description of the water tank and all fields, sends it to Gemini,
+    Builds a description of the water tank and all fields, sends it to GitHub Models (GPT-4o-mini),
     and returns the parsed JSON response with rationing recommendations.
     
     Returns JSON with Gemini's rationing recommendations.
@@ -1615,7 +1652,7 @@ If total water needed exceeds available water, skip lowest-priority fields. Fiel
     
     except json.JSONDecodeError as e:
         return jsonify({
-            "error": "Failed to parse Gemini response as JSON",
+            "error": "Failed to parse AI response as JSON",
             "details": str(e)
         }), 400
     
