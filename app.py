@@ -711,7 +711,7 @@ DASHBOARD_HTML = """
         
         <!-- Water Tank Section -->
         <div class="water-tank-section">
-            <div class="water-tank-card">
+            <div class="water-tank-card" id="tankCard">
                 <h2>💧 Water Tank Status</h2>
                 <div class="water-status" id="waterStatus">5000 / 5000 L</div>
                 <div class="water-bar">
@@ -904,6 +904,20 @@ DASHBOARD_HTML = """
             const percent = (data.remaining / data.total) * 100;
             document.getElementById('waterStatus').textContent = `${data.remaining} / ${data.total} L`;
             document.getElementById('waterFill').style.width = percent + '%';
+            
+            // Warning color when tank is below 20%
+            const fillBar = document.getElementById('waterFill');
+            const tankCard = document.getElementById('tankCard');
+            
+            if (percent <= 20) {
+                fillBar.style.background = 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)';
+                tankCard.style.border = '2px solid #ef4444';
+                tankCard.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.3)';
+            } else {
+                fillBar.style.background = 'linear-gradient(90deg, #0ea5e9 0%, #06b6d4 100%)';
+                tankCard.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+                tankCard.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
+            }
         }
         
         // Display field cards
