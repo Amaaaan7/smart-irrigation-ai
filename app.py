@@ -21,6 +21,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Global data storage
+ORIGINAL_WATER_TANK = 3200
 WATER_TANK = 3200
 TANK_CAPACITY = 5000
 NEXT_FIELD_ID = 5
@@ -97,7 +98,6 @@ DASHBOARD_HTML = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Irrigation Dashboard</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.css">
     <style>
         * {
             margin: 0;
@@ -1171,7 +1171,7 @@ DASHBOARD_HTML = """
             fields.forEach(field => {
                 const priority = calculatePriority(field);
                 const waterNeeded = field.water_needed_liters;
-                const moisturePercent = Math.round((field.current_moisture / field.target_moisture) * 100);
+                const moisturePercent = Math.min(100, Math.round((field.current_moisture / field.target_moisture) * 100));
                 
                 const card = document.createElement('div');
                 card.className = `field-card ${priority}`;
@@ -1449,7 +1449,7 @@ DASHBOARD_HTML = """
                 html += `
                     </div>
                     <div style="margin-top: 24px; text-align: center;">
-                        <button onclick="applyRationingPlan()" style="background: linear-gradient(135deg, #667eea 0%, #22c55e 100%); color: white; border: none; padding: 14px 32px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 1em; transition: all 0.3s ease;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                        <button onclick="applyRationingPlan()" style="background: linear-gradient(135deg, #667eea 0%, #22c55e 100%); color: white; border: none; padding: 14px 32px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 1em;">
                             ⚡ Apply Plan — Activate Fields Now
                         </button>
                     </div>
@@ -1537,8 +1537,8 @@ DASHBOARD_HTML = """
         
         // Load fields on page load
         window.addEventListener('load', async () => {
-            await loadFields();
             await loadSeasonData();
+            await loadFields();
             await loadMoistureHistory();
         });
     </script>
@@ -1556,7 +1556,8 @@ def save_state():
             "TANK_CAPACITY": TANK_CAPACITY,
             "NEXT_FIELD_ID": NEXT_FIELD_ID,
             "WATER_AI_USED": WATER_AI_USED,
-            "WATER_MANUAL_USED": WATER_MANUAL_USED
+            "WATER_MANUAL_USED": WATER_MANUAL_USED,
+            "MOISTURE_HISTORY": MOISTURE_HISTORY
         }
         with open(DATA_FILE, 'w') as f:
             json.dump(state, f, indent=2)
@@ -1566,7 +1567,7 @@ def save_state():
 
 def load_state():
     """Load state from data.json"""
-    global FIELDS, WATER_TANK, TANK_CAPACITY, NEXT_FIELD_ID, WATER_AI_USED, WATER_MANUAL_USED
+    global FIELDS, WATER_TANK, TANK_CAPACITY, NEXT_FIELD_ID, WATER_AI_USED, WATER_MANUAL_USED, MOISTURE_HISTORY
     try:
         if os.path.exists(DATA_FILE):
             with open(DATA_FILE, 'r') as f:
@@ -1577,6 +1578,7 @@ def load_state():
                 NEXT_FIELD_ID = state.get("NEXT_FIELD_ID", NEXT_FIELD_ID)
                 WATER_AI_USED = state.get("WATER_AI_USED", 0)
                 WATER_MANUAL_USED = state.get("WATER_MANUAL_USED", 0)
+                MOISTURE_HISTORY = state.get("MOISTURE_HISTORY", {})
     except Exception as e:
         print(f"Error loading state: {e}")
 
@@ -1599,7 +1601,7 @@ def get_seasonal_status(tree_types):
         from datetime import datetime
         month_name = datetime.now().strftime("%B")
         
-        prompt = f"""Today is {month_name} in a Mediterranean climate. For each crop: {uncached}, determine which are in their PEAK irrigation season (critical growth phase: fruit development, fruit set, berry sizing, or oil accumulation). Respond with ONLY a JSON object like {{"Orange": true, "Olive": false}}. No explanation, no markdown."""
+        prompt = f"""Today is {month_name} in a Mediterranean climate. For each crop: {uncached}, determine which are in their PEAK irrigation season (critical growth phase: fruit development, fruit swelling). Respond with ONLY valid JSON (no markdown, no explanation): {{{", ".join(f'"{t}": true/false' for t in uncached)}}}"""
         
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -1870,6 +1872,9 @@ def refill_water_tank():
     data = request.get_json()
     amount = data.get("amount", 0)
     
+    if amount <= 0:
+        return jsonify({"error": "Amount must be positive"}), 400
+    
     WATER_TANK = min(WATER_TANK + amount, TANK_CAPACITY)
     save_state()
     
@@ -1979,14 +1984,14 @@ def get_water_savings():
 def reset_demo():
     """
     Reset the entire demo to initial state:
-    - Reset WATER_TANK to TANK_CAPACITY
+    - Reset WATER_TANK to ORIGINAL_WATER_TANK
     - Restore all fields to their original current_moisture values
     - Deactivate all watering
     - Clear history and water tracking
     """
     global WATER_TANK, WATER_AI_USED, WATER_MANUAL_USED, MOISTURE_HISTORY
     
-    WATER_TANK = TANK_CAPACITY
+    WATER_TANK = ORIGINAL_WATER_TANK
     WATER_AI_USED = 0
     WATER_MANUAL_USED = 0
     MOISTURE_HISTORY = {}
@@ -2001,7 +2006,7 @@ def reset_demo():
     
     return jsonify({
         "status": "reset",
-        "message": f"✅ Demo reset! Tank restored to {TANK_CAPACITY}L, {len(FIELDS)} field(s) restored to original state."
+        "message": f"✅ Demo reset! Tank restored to {ORIGINAL_WATER_TANK}L, {len(FIELDS)} field(s) restored to original state."
     })
 
 
@@ -2152,7 +2157,7 @@ def simulate_sensor_data():
             # Watering worked: gradual increase and turn off
             field["current_moisture"] = min(95, field["current_moisture"] + random.uniform(2, 5))
             field["watering_active"] = False
-            changes.append(f"{field['name']}: +20% (watering effect)")
+            changes.append(f"{field['name']}: +2-5% (watering effect)")
         else:
             # Natural drift: slow drying, slight recovery possible
             drift = random.uniform(-3, -1)
