@@ -7,6 +7,7 @@ from openai import OpenAI
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+import requests
 
 # Load environment variables from .env file
 load_dotenv()
@@ -89,6 +90,12 @@ WATER_MANUAL_USED = 0
 
 # Moisture history for charting
 MOISTURE_HISTORY = {}
+
+# Weather cache (refresh every hour)
+WEATHER_CACHE = {
+    "data": None,
+    "timestamp": None
+}
 
 # HTML Dashboard Template
 DASHBOARD_HTML = """
@@ -212,7 +219,7 @@ DASHBOARD_HTML = """
         /* Water Tank Section */
         .water-tank-section {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
             gap: 20px;
             margin-bottom: 30px;
         }
@@ -269,6 +276,14 @@ DASHBOARD_HTML = """
             background: #f0fdf4;
             border-radius: 6px;
             font-weight: 500;
+        }
+
+        .weather-rain {
+            color: #0ea5e9;
+        }
+
+        .weather-dry {
+            color: #f59e0b;
         }
         
         .refill-form {
@@ -697,7 +712,7 @@ DASHBOARD_HTML = """
             background-color: rgba(255, 255, 255, 0.5);
         }
         
-.priority-badge {
+        .priority-badge {
             display: inline-block;
             padding: 6px 12px;
             border-radius: 20px;
@@ -724,7 +739,7 @@ DASHBOARD_HTML = """
             border-top: 1px solid rgba(255, 255, 255, 0.3);
         }
         
-.moisture-bar {
+        .moisture-bar {
             background-color: #e0e0e0;
             height: 8px;
             border-radius: 5px;
@@ -804,6 +819,18 @@ DASHBOARD_HTML = """
             padding: 40px;
             font-size: 1.1em;
         }
+
+        @media (max-width: 1200px) {
+            .water-tank-section {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .water-tank-section {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -843,9 +870,13 @@ DASHBOARD_HTML = """
                 <form class="refill-form" onsubmit="setTankCapacity(event)">
                     <input type="number" id="tankCapacity" placeholder="Enter capacity (liters)" min="1" step="10" required>
                     <button type="submit" class="btn-primary">Set</button>
-                    </form>
+                </form>
             </div>
 
+            <div class="water-tank-card">
+                <h2>🌦️ Weather Forecast</h2>
+                <div id="weatherDisplay" style="font-size: 1.1em; line-height: 1.6;">Loading...</div>
+            </div>
         </div>
         
         <!-- Add Field Form -->
@@ -920,6 +951,7 @@ DASHBOARD_HTML = """
         let currentPlan = null;
         let seasonData = {};
         let historyChart = null;
+        let weatherData = null;
 
         // Calculate water needed for a field
         function calculateWaterNeeded(field) {
@@ -935,6 +967,26 @@ DASHBOARD_HTML = """
             if (current < target - 10) return "high";
             if (current < target) return "medium";
             return "low";
+        }
+
+        // Load weather data
+        async function loadWeather() {
+            try {
+                const response = await fetch('/api/weather');
+                if (!response.ok) throw new Error('Failed to load weather data');
+                const data = await response.json();
+                weatherData = data;
+                
+                const display = document.getElementById('weatherDisplay');
+                if (data.rain_expected_mm > 5) {
+                    display.innerHTML = `<span class="weather-rain">🌧️ ${data.rain_expected_mm}mm rain expected</span><br/><span style="font-size: 0.9em; color: #666;">${data.advice}</span>`;
+                } else {
+                    display.innerHTML = `<span class="weather-dry">☀️ No rain expected</span><br/><span style="font-size: 0.9em; color: #666;">${data.advice}</span>`;
+                }
+            } catch (error) {
+                console.error('Error loading weather:', error);
+                document.getElementById('weatherDisplay').textContent = 'Weather unavailable';
+            }
         }
 
         // Load seasonal data
@@ -1540,6 +1592,7 @@ DASHBOARD_HTML = """
             await loadSeasonData();
             await loadFields();
             await loadMoistureHistory();
+            await loadWeather();
         });
     </script>
 </body>
@@ -1581,6 +1634,56 @@ def load_state():
                 MOISTURE_HISTORY = state.get("MOISTURE_HISTORY", {})
     except Exception as e:
         print(f"Error loading state: {e}")
+
+
+def get_weather_forecast():
+    """
+    Fetch weather forecast from Open-Meteo API for Tunisia (Mediterranean).
+    Returns next 3 days of precipitation data.
+    
+    Hardcoded coordinates:
+    - Latitude: 36.8 (Tunisia)
+    - Longitude: 10.18 (Tunisia)
+    """
+    try:
+        url = "https://api.open-meteo.com/v1/forecast"
+        params = {
+            "latitude": 36.8,
+            "longitude": 10.18,
+            "daily": "precipitation_sum",
+            "timezone": "auto"
+        }
+        
+        response = requests.get(url, params=params, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Extract next 3 days of precipitation
+        daily_data = data.get("daily", {})
+        precipitation = daily_data.get("precipitation_sum", [])
+        
+        # Sum first 3 days
+        rain_expected_mm = sum(precipitation[:3]) if len(precipitation) >= 3 else sum(precipitation)
+        
+        # Generate advice
+        if rain_expected_mm > 10:
+            advice = "Reduce irrigation by 30% - Heavy rain expected"
+        elif rain_expected_mm > 5:
+            advice = "Reduce irrigation by 15% - Moderate rain expected"
+        else:
+            advice = "Irrigate normally - Minimal rain expected"
+        
+        return {
+            "rain_expected_mm": round(rain_expected_mm, 1),
+            "advice": advice
+        }
+    
+    except Exception as e:
+        print(f"Error fetching weather: {e}")
+        return {
+            "rain_expected_mm": 0,
+            "advice": "Unable to fetch weather data"
+        }
 
 
 def get_seasonal_status(tree_types):
@@ -1978,6 +2081,13 @@ def get_water_savings():
     })
 
 
+@app.route("/api/weather", methods=["GET"])
+def get_weather():
+    """Get weather forecast for the farm"""
+    weather_data = get_weather_forecast()
+    return jsonify(weather_data)
+
+
 # ============ Demo Reset Route ============
 
 @app.route("/api/reset-demo", methods=["POST"])
@@ -2021,15 +2131,18 @@ def ai_rationing():
     giving all to highest priority first. This ensures all critical fields get water.
     """
     try:
-        # Get seasonal status
+        # Get seasonal status and weather data
         tree_types = [f["tree_type"] for f in FIELDS]
         seasonal_status = get_seasonal_status(tree_types)
+        weather = get_weather_forecast()
         
-        # Build description string with seasonal context
+        # Build description string with seasonal context and weather
         description = f"Water Tank Status:\n"
         description += f"- Total Capacity: {TANK_CAPACITY} liters\n"
         description += f"- Current Level: {WATER_TANK} liters\n"
         description += f"- Available: {WATER_TANK} liters\n\n"
+        
+        description += f"Weather Forecast: {weather['rain_expected_mm']} mm rain expected in next 3 days.\n\n"
         
         description += f"Fields ({len(FIELDS)} total):\n"
         for field in FIELDS:
@@ -2134,14 +2247,18 @@ def simulate_sensor_data():
     Simulate sensor data with realistic moisture drift.
     
     For each field:
-    - If watering_active: increase moisture by 20, set watering_active=False
-    - Otherwise: drift moisture by random value between -15 and +15
+    - If watering_active: increase moisture by 2-5, set watering_active=False
+    - Otherwise: drift moisture by random value between -3 and -1 (or -1 to 0 if rain > 5mm)
     - Clamp result between 10 and 95
     
     Track moisture history for charting.
     Returns summary of changes.
     """
     global WATER_TANK
+    
+    # Get weather data
+    weather = get_weather_forecast()
+    rain_expected = weather.get("rain_expected_mm", 0)
     
     changes = []
     
@@ -2159,12 +2276,16 @@ def simulate_sensor_data():
             field["watering_active"] = False
             changes.append(f"{field['name']}: +2-5% (watering effect)")
         else:
-            # Natural drift: slow drying, slight recovery possible
-            drift = random.uniform(-3, -1)
+            # Natural drift: slow drying, reduced if rain expected
+            if rain_expected > 5:
+                drift = random.uniform(-1, 0)  # Reduced drift if rain expected
+            else:
+                drift = random.uniform(-3, -1)  # Normal drying
+            
             field["current_moisture"] += drift
             # Clamp between 10 and 95
             field["current_moisture"] = max(10, min(95, field["current_moisture"]))
-            drift_str = f"+{drift}" if drift >= 0 else f"{drift}"
+            drift_str = f"+{drift:.1f}" if drift >= 0 else f"{drift:.1f}"
             changes.append(f"{field['name']}: {drift_str}%")
         
         # Cap history at 10 readings per field
