@@ -1,6 +1,6 @@
 # Farm Water Agent 💧🌾
 
-An AI-powered irrigation management system that rations water intelligently across agricultural fields — prioritizing thirsty crops, predicting tank runout, and letting you talk to your farm in plain language.
+An AI-powered irrigation management system that rations water intelligently across agricultural fields prioritizing thirsty crops, predicting tank runout, and letting you talk to your farm in plain language.
 
 > Built for: **Agents League Hackathon — Creative Apps**
 
@@ -8,9 +8,9 @@ An AI-powered irrigation management system that rations water intelligently acro
 
 ## The Problem
 
-Farmers in Tunisia face extreme heat and unpredictable rainfall. My father runs multiple fields — all fed by the same water tank — and managing them by hand gets overwhelming fast. Different crops have different water needs at different times of year, and it's easy to lose track.
+Farmers in Tunisia face extreme heat and unpredictable rainfall. My father runs multiple fields all fed by the same water tank and managing them by hand gets overwhelming fast. Different crops have different water needs at different times of year, and it's easy to lose track.
 
-Last year, by over-focusing on peppers and potatoes, his olive production suffered badly. He lost money — and more importantly, wasted water he couldn't afford to waste.
+Last year, by over-focusing on peppers and potatoes, his olive production suffered badly. He lost money and more importantly, wasted water he couldn't afford to waste.
 
 That's what this project is trying to fix.
 
