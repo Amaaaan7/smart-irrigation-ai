@@ -831,6 +831,182 @@ DASHBOARD_HTML = """
                 grid-template-columns: 1fr;
             }
         }
+
+        /* ===== Tank Runout Prediction ===== */
+        .runout-card {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 16px;
+            padding: 20px 28px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .runout-icon { font-size: 2.4em; flex-shrink: 0; }
+        .runout-info { flex: 1; min-width: 200px; }
+        .runout-title {
+            font-size: 0.78em;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .runout-days {
+            font-size: 2.2em;
+            font-weight: 800;
+            color: #0ea5e9;
+            line-height: 1.1;
+            margin-bottom: 3px;
+        }
+        .runout-days.warning { color: #f59e0b; }
+        .runout-days.critical { color: #ef4444; }
+        .runout-message { font-size: 0.92em; color: #334155; font-weight: 500; }
+        .runout-detail  { font-size: 0.82em; color: #94a3b8; margin-top: 4px; }
+
+        /* ===== AI Farm Chat ===== */
+        .chat-fab {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 62px;
+            height: 62px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            font-size: 1.6em;
+            color: white;
+            box-shadow: 0 4px 22px rgba(102, 126, 234, 0.55);
+            z-index: 1000;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .chat-fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 28px rgba(102, 126, 234, 0.75);
+        }
+        .chat-panel {
+            position: fixed;
+            bottom: 105px;
+            right: 30px;
+            width: 360px;
+            background: white;
+            border-radius: 18px;
+            box-shadow: 0 12px 44px rgba(0,0,0,0.22);
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transform: scale(0.95) translateY(12px);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.22s ease;
+        }
+        .chat-panel.open {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+            pointer-events: all;
+        }
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 14px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-header h3 { margin: 0; font-size: 1em; }
+        .chat-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.25em;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            opacity: 0.85;
+        }
+        .chat-close:hover { opacity: 1; }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-height: 220px;
+            max-height: 320px;
+        }
+        .chat-msg {
+            max-width: 88%;
+            padding: 10px 14px;
+            border-radius: 14px;
+            font-size: 0.88em;
+            line-height: 1.55;
+        }
+        .chat-msg.user {
+            background: #667eea;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        .chat-msg.ai {
+            background: #f1f5f9;
+            color: #1e293b;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        .chat-msg.typing {
+            background: #f1f5f9;
+            color: #94a3b8;
+            align-self: flex-start;
+            font-style: italic;
+        }
+        .chat-input-area {
+            padding: 11px 13px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 8px;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 9px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 20px;
+            font-size: 0.88em;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .chat-input:focus { border-color: #667eea; }
+        .chat-send {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            font-size: 1em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.18s;
+            flex-shrink: 0;
+        }
+        .chat-send:hover { transform: scale(1.12); }
+        .chat-send:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        @media (max-width: 480px) {
+            .chat-panel { width: calc(100vw - 20px); right: 10px; bottom: 90px; }
+            .chat-fab  { bottom: 18px; right: 18px; }
+        }
     </style>
 </head>
 <body>
@@ -879,6 +1055,17 @@ DASHBOARD_HTML = """
             </div>
         </div>
         
+        <!-- Tank Runout Prediction -->
+        <div class="runout-card" id="runoutCard">
+            <div class="runout-icon" id="runoutIcon">⏳</div>
+            <div class="runout-info">
+                <div class="runout-title">Tank Runout Prediction</div>
+                <div class="runout-days" id="runoutDays">—</div>
+                <div class="runout-message" id="runoutMessage">Calculating...</div>
+                <div class="runout-detail" id="runoutDetail"></div>
+            </div>
+        </div>
+
         <!-- Add Field Form -->
         <div class="form-section">
             <h2>➕ Add New Field</h2>
@@ -1171,6 +1358,7 @@ DASHBOARD_HTML = """
                 displayFields(fields);
                 loadWaterTank();
                 loadWaterEfficiency();
+                loadRunoutPrediction();
             } catch (error) {
                 console.error('Error loading fields:', error);
             }
@@ -1587,14 +1775,135 @@ DASHBOARD_HTML = """
             }, duration);
         }
         
+        // ===== Tank Runout Prediction =====
+        async function loadRunoutPrediction() {
+            try {
+                const res = await fetch('/api/runout-prediction');
+                if (!res.ok) return;
+                const data = await res.json();
+
+                const daysEl   = document.getElementById('runoutDays');
+                const msgEl    = document.getElementById('runoutMessage');
+                const iconEl   = document.getElementById('runoutIcon');
+                const detailEl = document.getElementById('runoutDetail');
+
+                if (data.days_remaining === null) {
+                    daysEl.textContent  = '∞';
+                    daysEl.className    = 'runout-days';
+                    iconEl.textContent  = '✅';
+                    msgEl.textContent   = data.message;
+                    detailEl.textContent = '';
+                } else {
+                    const d = data.days_remaining;
+                    daysEl.textContent = d < 1 ? `${Math.round(d * 24)} hrs` : `~${Math.round(d)} days`;
+                    msgEl.textContent  = data.message;
+                    detailEl.textContent =
+                        `${data.tank_remaining}L in tank · ${data.total_per_cycle}L per cycle · ${data.cycles_remaining} cycles left`;
+
+                    if (data.urgency === 'critical') {
+                        daysEl.className = 'runout-days critical';
+                        iconEl.textContent = '🚨';
+                    } else if (data.urgency === 'warning') {
+                        daysEl.className = 'runout-days warning';
+                        iconEl.textContent = '⚠️';
+                    } else {
+                        daysEl.className = 'runout-days';
+                        iconEl.textContent = '💧';
+                    }
+                }
+            } catch (err) {
+                console.error('Runout prediction error:', err);
+            }
+        }
+
+        // ===== AI Farm Chat =====
+        let chatOpen = false;
+
+        function toggleChat() {
+            chatOpen = !chatOpen;
+            const panel = document.getElementById('chatPanel');
+            const fab   = document.getElementById('chatFab');
+            panel.classList.toggle('open', chatOpen);
+            fab.textContent = chatOpen ? '✕' : '💬';
+            if (chatOpen) document.getElementById('chatInput').focus();
+        }
+
+        async function sendChat() {
+            const input   = document.getElementById('chatInput');
+            const sendBtn = document.getElementById('chatSend');
+            const msgs    = document.getElementById('chatMessages');
+            const text    = input.value.trim();
+            if (!text) return;
+
+            // Append user bubble
+            const userBubble = document.createElement('div');
+            userBubble.className = 'chat-msg user';
+            userBubble.textContent = text;
+            msgs.appendChild(userBubble);
+
+            input.value = '';
+            sendBtn.disabled = true;
+
+            // Typing indicator
+            const typing = document.createElement('div');
+            typing.className = 'chat-msg typing';
+            typing.id = 'typingIndicator';
+            typing.textContent = '⏳ Thinking...';
+            msgs.appendChild(typing);
+            msgs.scrollTop = msgs.scrollHeight;
+
+            try {
+                const res  = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+                const data = await res.json();
+                typing.remove();
+
+                const aiBubble = document.createElement('div');
+                aiBubble.className = 'chat-msg ai';
+                aiBubble.textContent = data.reply || 'Sorry, no response received.';
+                msgs.appendChild(aiBubble);
+            } catch (err) {
+                typing.remove();
+                const errBubble = document.createElement('div');
+                errBubble.className = 'chat-msg ai';
+                errBubble.textContent = '❌ Could not reach AI. Try again.';
+                msgs.appendChild(errBubble);
+            } finally {
+                sendBtn.disabled = false;
+                msgs.scrollTop = msgs.scrollHeight;
+            }
+        }
+
         // Load fields on page load
         window.addEventListener('load', async () => {
             await loadSeasonData();
             await loadFields();
             await loadMoistureHistory();
             await loadWeather();
+            await loadRunoutPrediction();
         });
     </script>
+    <!-- AI Farm Chat -->
+    <button class="chat-fab" onclick="toggleChat()" id="chatFab" title="Ask your farm AI">💬</button>
+
+    <div class="chat-panel" id="chatPanel">
+        <div class="chat-header">
+            <h3>🤖 Farm AI Assistant</h3>
+            <button class="chat-close" onclick="toggleChat()">✕</button>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="chat-msg ai">👋 Hey! Ask me anything about your farm — which field needs water most, when the tank runs out, whether to water given the forecast, anything.</div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" class="chat-input" id="chatInput"
+                   placeholder="Ask about your farm..."
+                   onkeydown="if(event.key==='Enter') sendChat()">
+            <button class="chat-send" id="chatSend" onclick="sendChat()">➤</button>
+        </div>
+    </div>
 </body>
 </html>
 """
@@ -2301,6 +2610,127 @@ def simulate_sensor_data():
         "status": "ok",
         "summary": summary
     })
+
+
+
+
+# ============ Tank Runout Prediction Route ============
+
+@app.route("/api/runout-prediction", methods=["GET"])
+def get_runout_prediction():
+    """
+    Estimate how many days until the water tank runs out.
+
+    Logic:
+    - Sum water needed across all fields  →  one full irrigation cycle
+    - days_remaining = tank_level / water_per_cycle  (assumes 1 cycle/day)
+    - Returns urgency: safe / warning / critical
+    """
+    total_water_needed = sum(calculate_water_needed(f) for f in FIELDS)
+
+    if total_water_needed <= 0:
+        return jsonify({
+            "days_remaining": None,
+            "cycles_remaining": None,
+            "total_per_cycle": 0,
+            "tank_remaining": WATER_TANK,
+            "urgency": "safe",
+            "message": "All fields at target moisture — no watering needed right now"
+        })
+
+    cycles_remaining = round(WATER_TANK / total_water_needed, 1)
+    days_remaining   = cycles_remaining  # 1 full cycle per day assumption
+
+    if days_remaining <= 2:
+        urgency = "critical"
+        message = f"⚠️ Refill urgently — only ~{days_remaining:.1f} day(s) of water left"
+    elif days_remaining <= 7:
+        urgency = "warning"
+        message = f"Plan a refill soon — ~{round(days_remaining):.0f} days remaining"
+    else:
+        urgency = "safe"
+        message = f"Tank is healthy — ~{round(days_remaining)} days at current usage rate"
+
+    return jsonify({
+        "days_remaining":   round(days_remaining, 1),
+        "cycles_remaining": cycles_remaining,
+        "total_per_cycle":  round(total_water_needed, 1),
+        "tank_remaining":   WATER_TANK,
+        "urgency":          urgency,
+        "message":          message
+    })
+
+
+# ============ AI Farm Chat Route ============
+
+@app.route("/api/chat", methods=["POST"])
+def farm_chat():
+    """
+    Natural language chat endpoint.
+    Builds full farm context (fields, tank, weather) and sends it to GPT-4o-mini
+    so the AI can answer questions like:
+      - "Which field needs water most urgently?"
+      - "How many days until the tank runs out?"
+      - "Should I water given tomorrow's rain forecast?"
+    """
+    data = request.get_json()
+    user_message = (data.get("message") or "").strip()
+
+    if not user_message:
+        return jsonify({"error": "No message provided"}), 400
+
+    try:
+        weather = get_weather_forecast()
+        total_water_needed = sum(calculate_water_needed(f) for f in FIELDS)
+        cycles_remaining = (
+            round(WATER_TANK / total_water_needed, 1)
+            if total_water_needed > 0 else 999
+        )
+        tank_pct = round((WATER_TANK / TANK_CAPACITY) * 100, 1)
+
+        context = (
+            f"You are a smart irrigation assistant. Current farm status:\n\n"
+            f"WATER TANK: {WATER_TANK}L / {TANK_CAPACITY}L ({tank_pct}% full)\n"
+            f"ESTIMATED DAYS REMAINING: ~{cycles_remaining} days at current usage\n"
+            f"WEATHER (next 3 days): {weather['rain_expected_mm']}mm rain expected — {weather['advice']}\n\n"
+            f"FIELDS:"
+        )
+
+        for field in FIELDS:
+            priority    = calculate_priority(field)
+            water_needed = calculate_water_needed(field)
+            context += (
+                f"\n• {field['name']} [{field['tree_type']}, "
+                f"{field['tree_count']} trees, {field['area_m2']}m²]"
+                f"\n  Moisture: {field['current_moisture']}% "
+                f"(target {field['target_moisture']}%) | "
+                f"Priority: {priority.upper()} | "
+                f"Water needed: {water_needed}L | "
+                f"Watering: {'ON' if field['watering_active'] else 'OFF'}"
+            )
+
+        context += f"\n\nTotal water for one full cycle: {round(total_water_needed, 1)}L"
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        f"{context}\n\n"
+                        "Answer the farmer's question concisely and helpfully in under 120 words. "
+                        "Be specific — use the exact numbers from the data above."
+                    )
+                },
+                {"role": "user", "content": user_message}
+            ],
+            max_tokens=200
+        )
+
+        return jsonify({"reply": response.choices[0].message.content.strip()})
+
+    except Exception as e:
+        return jsonify({"error": "AI unavailable", "details": str(e)}), 500
 
 
 if __name__ == "__main__":
