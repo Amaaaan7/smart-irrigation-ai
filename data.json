@@ -1,0 +1,70 @@
+{
+  "FIELDS": [
+    {
+      "id": 1,
+      "name": "North Orchard",
+      "tree_type": "Orange",
+      "tree_count": 50,
+      "position": "North",
+      "area_m2": 2000,
+      "current_moisture": 22,
+      "target_moisture": 60,
+      "watering_active": false,
+      "original_current_moisture": 22
+    },
+    {
+      "id": 2,
+      "name": "South Grove",
+      "tree_type": "Olive",
+      "tree_count": 80,
+      "position": "South",
+      "area_m2": 3500,
+      "current_moisture": 30,
+      "target_moisture": 55,
+      "watering_active": false,
+      "original_current_moisture": 30
+    },
+    {
+      "id": 3,
+      "name": "East Field",
+      "tree_type": "Apple",
+      "tree_count": 30,
+      "position": "East",
+      "area_m2": 1200,
+      "current_moisture": 52,
+      "target_moisture": 65,
+      "watering_active": false,
+      "original_current_moisture": 52
+    },
+    {
+      "id": 4,
+      "name": "West Vineyard",
+      "tree_type": "Grape",
+      "tree_count": 120,
+      "position": "West",
+      "area_m2": 4000,
+      "current_moisture": 70,
+      "target_moisture": 60,
+      "watering_active": false,
+      "original_current_moisture": 70
+    },
+    {
+      "id": 5,
+      "name": "A",
+      "tree_type": "almonds",
+      "tree_count": 12,
+      "position": "north",
+      "area_m2": 500,
+      "current_moisture": 16,
+      "original_current_moisture": 16,
+      "target_moisture": 60,
+      "watering_active": false
+    }
+  ],
+  "WATER_TANK": 3200,
+  "TANK_CAPACITY": 5000,
+  "NEXT_FIELD_ID": 6,
+  "WATER_AI_USED": 0,
+  "WATER_MANUAL_USED": 0,
+  "MOISTURE_HISTORY": {}
+}
