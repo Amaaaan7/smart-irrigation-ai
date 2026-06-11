@@ -114,14 +114,51 @@ DASHBOARD_HTML = """
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0c4a6e 100%);
+            background: #080f1a;
             min-height: 100vh;
             padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Animated aurora glow blobs — green (earth), blue (water), amber (sun), purple (depth) */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 70% 55% at 12% 18%, rgba(34, 197, 94,  0.14) 0%, transparent 65%),
+                radial-gradient(ellipse 55% 65% at 88% 78%, rgba(14, 165, 233, 0.15) 0%, transparent 65%),
+                radial-gradient(ellipse 45% 42% at 55% 48%, rgba(245, 158, 11, 0.07) 0%, transparent 65%),
+                radial-gradient(ellipse 60% 38% at 28% 82%, rgba(99, 102, 241, 0.10) 0%, transparent 60%);
+            animation: auroraFloat 18s ease-in-out infinite alternate;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Subtle dot grid overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.032) 1px, transparent 1px);
+            background-size: 28px 28px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        @keyframes auroraFloat {
+            0%   { transform: scale(1)    translate(  0%,    0%); }
+            30%  { transform: scale(1.04) translate(  2%,  -1.5%); }
+            65%  { transform: scale(0.97) translate( -1.5%,  2%); }
+            100% { transform: scale(1.07) translate( -2%,  -2%); }
         }
         
         .container {
             max-width: 1400px;
             margin: 0 auto;
+            position: relative;
+            z-index: 1;
         }
         
         .header {
@@ -810,7 +847,8 @@ DASHBOARD_HTML = """
         }
 
         #historyChart {
-            max-height: 400px;
+            width: 100% !important;
+            height: 320px !important;
         }
         
         .empty-state {
@@ -1246,13 +1284,49 @@ DASHBOARD_HTML = """
 
                 const ctx = document.getElementById('historyChart').getContext('2d');
                 if (historyChart) historyChart.destroy();
+
+                // Calculate dynamic y-axis range so lines spread across the chart
+                const allValues = datasets.flatMap(d => d.data).filter(v => v != null);
+                const dataMin = allValues.length ? Math.min(...allValues) : 0;
+                const dataMax = allValues.length ? Math.max(...allValues) : 100;
+                const padding  = Math.max((dataMax - dataMin) * 0.25, 8);
+
+                // Apply tension + slightly thicker lines to each dataset
+                datasets.forEach(ds => {
+                    ds.tension     = 0.35;
+                    ds.borderWidth = 2.5;
+                    ds.pointRadius = 4;
+                    ds.pointHoverRadius = 6;
+                });
+
                 historyChart = new Chart(ctx, {
                     type: 'line',
-                    data: { labels: Array.from({length: Math.max(...datasets.map(d => d.data.length))}, (_, i) => `Reading ${i+1}`), datasets },
+                    data: {
+                        labels: Array.from(
+                            { length: Math.max(...datasets.map(d => d.data.length)) },
+                            (_, i) => `Reading ${i + 1}`
+                        ),
+                        datasets
+                    },
                     options: {
                         responsive: true,
-                        plugins: { legend: { position: 'top' } },
-                        scales: { y: { beginAtZero: true, max: 100 } }
+                        maintainAspectRatio: false,
+                        devicePixelRatio: window.devicePixelRatio || 2,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: { font: { size: 12 }, boxWidth: 24, padding: 16 }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                min: Math.max(0,   Math.floor(dataMin - padding)),
+                                max: Math.min(100, Math.ceil (dataMax + padding)),
+                                title: { display: true, text: 'Moisture %', font: { size: 12 } },
+                                grid: { color: 'rgba(0,0,0,0.06)' }
+                            },
+                            x: { grid: { color: 'rgba(0,0,0,0.06)' } }
+                        }
                     }
                 });
             } catch (error) {
@@ -1439,7 +1513,7 @@ DASHBOARD_HTML = """
                     <p><strong>Area:</strong> ${field.area_m2} m²</p>
                     
                     <div class="moisture-info">
-                        <p><strong>Current Moisture:</strong> ${field.current_moisture}%</p>
+                        <p><strong>Current Moisture:</strong> ${parseFloat(field.current_moisture).toFixed(1)}%</p>
                         <p><strong>Target Moisture:</strong> ${field.target_moisture}%</p>
                         <div class="moisture-bar">
                             <div class="moisture-fill" style="width: ${moisturePercent}%"></div>
@@ -1949,11 +2023,21 @@ def get_weather_forecast():
     """
     Fetch weather forecast from Open-Meteo API for Tunisia (Mediterranean).
     Returns next 3 days of precipitation data.
-    
-    Hardcoded coordinates:
-    - Latitude: 36.8 (Tunisia)
-    - Longitude: 10.18 (Tunisia)
+
+    Fallback chain:
+      1. Live API call (timeout 8s)
+      2. Last successful cached result
+      3. Realistic Tunisia June seasonal estimate (hot & dry)
     """
+    global WEATHER_CACHE
+
+    # ── Serve from cache if it's less than 30 minutes old ──────────────────
+    if WEATHER_CACHE["data"] and WEATHER_CACHE["timestamp"]:
+        age = (datetime.now() - WEATHER_CACHE["timestamp"]).total_seconds()
+        if age < 1800:
+            return WEATHER_CACHE["data"]
+
+    # ── Try live API ────────────────────────────────────────────────────────
     try:
         url = "https://api.open-meteo.com/v1/forecast"
         params = {
@@ -1962,37 +2046,49 @@ def get_weather_forecast():
             "daily": "precipitation_sum",
             "timezone": "auto"
         }
-        
-        response = requests.get(url, params=params, timeout=5)
+
+        response = requests.get(url, params=params, timeout=8)
         response.raise_for_status()
         data = response.json()
-        
-        # Extract next 3 days of precipitation
-        daily_data = data.get("daily", {})
+
+        daily_data   = data.get("daily", {})
         precipitation = daily_data.get("precipitation_sum", [])
-        
-        # Sum first 3 days
         rain_expected_mm = sum(precipitation[:3]) if len(precipitation) >= 3 else sum(precipitation)
-        
-        # Generate advice
+
         if rain_expected_mm > 10:
-            advice = "Reduce irrigation by 30% - Heavy rain expected"
+            advice = "Reduce irrigation by 30% — heavy rain expected"
         elif rain_expected_mm > 5:
-            advice = "Reduce irrigation by 15% - Moderate rain expected"
+            advice = "Reduce irrigation by 15% — moderate rain expected"
         else:
-            advice = "Irrigate normally - Minimal rain expected"
-        
-        return {
+            advice = "Irrigate normally — minimal rain expected"
+
+        result = {
             "rain_expected_mm": round(rain_expected_mm, 1),
-            "advice": advice
+            "advice": advice,
+            "source": "live"
         }
-    
-    except Exception as e:
-        print(f"Error fetching weather: {e}")
-        return {
-            "rain_expected_mm": 0,
-            "advice": "Unable to fetch weather data"
-        }
+
+        # Save to cache
+        WEATHER_CACHE["data"]      = result
+        WEATHER_CACHE["timestamp"] = datetime.now()
+        return result
+
+    except Exception:
+        pass  # Fall through to cache / seasonal fallback
+
+    # ── Use stale cache if available ────────────────────────────────────────
+    if WEATHER_CACHE["data"]:
+        stale = dict(WEATHER_CACHE["data"])
+        stale["source"] = "cached"
+        stale["advice"] = stale["advice"].rstrip(".") + " (last known data)"
+        return stale
+
+    # ── Seasonal fallback — Tunisia, June: hot and dry ──────────────────────
+    return {
+        "rain_expected_mm": 0.2,
+        "advice": "Irrigate normally — dry conditions expected (Tunisia, June)",
+        "source": "estimate"
+    }
 
 
 def get_seasonal_status(tree_types):
