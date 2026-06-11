@@ -235,3 +235,6 @@ Weather coordinates are hardcoded to Tunisia (lat 36.8, lon 10.18). Change `get_
 Agriculture accounts for ~70% of global freshwater use. Targeted irrigation — watering only what needs it, only when it needs it — is one of the highest-leverage ways to reduce that number. This system is a step toward making that accessible without expensive hardware.
 
 ---
+Development Timeline
+June 4, 2026: Environment setup, Flask installation, basic dashboard scaffold, and repository configuration. (Pre-event preparation due to timezone confusion — clarified with Microsoft Reactor Team.)
+June 5–12, 2026: Core hackathon build period — priority algorithm, LLM integration, water distribution logic, demo video, and submission materials.
