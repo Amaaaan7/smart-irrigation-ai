@@ -36,7 +36,7 @@ Farm Water Agent continuously monitors soil moisture across all fields, runs an 
 
 ## Demo
 
-> Demo video under construction
+> https://youtu.be/sSUYN_xp21Y
 
 Screenshots:
 - Dashboard overview with field cards and tank status
